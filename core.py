@@ -1,5 +1,6 @@
 import db
 import requests
+import time
 from pyVintedVN import Vinted, requester
 from urllib.parse import urlparse, parse_qs, parse_qsl, urlencode, urlunparse
 from logger import get_logger
@@ -380,6 +381,10 @@ def clear_item_queue(items_queue, new_items_queue):
             )
 
         if is_first_run:
+            # An empty first run must still end priming, or the first matching
+            # listing ever found would be recorded silently instead of notified.
+            if db.get_last_timestamp(query_id) is None:
+                db.update_last_timestamp(query_id, int(time.time()))
             return
 
         # data arrives newest first and is walked in reverse, so to_notify runs
