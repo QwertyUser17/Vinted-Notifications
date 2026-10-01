@@ -1,7 +1,7 @@
 import db
 import requests
 from pyVintedVN import Vinted, requester
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import urlparse, parse_qs, parse_qsl, urlencode, urlunparse
 from logger import get_logger
 
 # Get logger for this module
@@ -303,7 +303,14 @@ def process_items(queue):
     for query in all_queries:
         all_items = vinted.items.search(query[1], nbr_items=items_per_query)
         # Filter to only include new items. This should reduce the amount of db calls.
-        data = [item for item in all_items if item.is_new_item()]
+        # svc-catalogue pads exact matches with loosely related listings, so
+        # keep only items whose title contains every word of the search text.
+        search_words = get_search_words(query[1])
+        data = [
+            item
+            for item in all_items
+            if item.is_new_item() and title_matches(item.title, search_words)
+        ]
         queue.put((data, query[0]))
         logger.info(f"Scraped {len(data)} items for query: {query[1]}")
 
@@ -397,6 +404,34 @@ def clear_item_queue(items_queue, new_items_queue):
             # add the item to the queue
             new_items_queue.put((content, item.url, "Open Vinted", None, None))
             # new_items_queue.put((content, item.url, "Open Vinted", item.buy_url, "Open buy page"))
+
+
+def get_search_words(url):
+    """
+    Extract the lowercased words of a query URL's search_text.
+
+    Args:
+        url (str): The Vinted search URL
+    Returns:
+        list: The search words, empty for filter-only queries
+    """
+    queries = parse_qsl(urlparse(url).query)
+    text = " ".join(value for key, value in queries if key == "search_text")
+    return text.lower().split()
+
+
+def title_matches(title, search_words):
+    """
+    Check if a title contains every search word (case-insensitive).
+
+    Args:
+        title (str): The title to check
+        search_words (list): Lowercased words from get_search_words
+    Returns:
+        bool: True if all words are in the title or there are no words
+    """
+    title_lower = title.lower()
+    return all(word in title_lower for word in search_words)
 
 
 def contains_banwords(title, banwords_str):
