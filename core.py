@@ -474,6 +474,11 @@ def contains_banwords(title, banwords_str):
     return False
 
 
+def version_key(version):
+    """Turn a version like "v1.0.5.4" into a tuple of ints for comparison."""
+    return tuple(int(part) for part in version.lstrip("v").split("."))
+
+
 def check_version():
     """
     Check if the application is up to date
@@ -489,7 +494,12 @@ def check_version():
 
         if response.status_code == 200:
             latest_version = response.url.split("/")[-1]
-            is_up_to_date = ver == latest_version
+            # Our own migrations can put the local version ahead of the latest
+            # release, so only a newer release counts as an update.
+            try:
+                is_up_to_date = version_key(ver) >= version_key(latest_version)
+            except ValueError:
+                is_up_to_date = ver == latest_version
             return is_up_to_date, ver, latest_version, github_url
         else:
             # If we can't check, assume it's up to date
