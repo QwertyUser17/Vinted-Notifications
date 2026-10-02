@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # --- build args / defaults for the runtime user ---
 ARG APP_UID=10001
