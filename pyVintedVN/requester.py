@@ -123,6 +123,11 @@ class Requester:
         }
         token = self.session.cookies.get("access_token_web")
         anon_id = self.session.cookies.get("anon_id")
+        # Without a Locale header svc-catalogue prices and filters in EUR and ranks
+        # search results worse; the www host hands out the matching locale cookie.
+        locale = self.session.cookies.get("anonymous-iso-locale")
+        if locale:
+            headers["Locale"] = locale
         if token:
             headers["Authorization"] = f"Bearer {token}"
         if anon_id:
