@@ -101,6 +101,7 @@ def index():
     # Get statistics for the dashboard
     stats = {
         "total_items": db.get_total_items_count(),
+        "hidden_items": db.get_hidden_items_count(),
         "total_queries": db.get_total_queries_count(),
         "items_per_day": db.get_items_per_day(),
     }
@@ -245,6 +246,7 @@ def update_query(query_id):
 def items():
     query_id = request.args.get("query", "")  # Default to empty string instead of None
     limit = int(request.args.get("limit", 50))
+    show_hidden = request.args.get("show_hidden") == "1"
 
     # Get items
     query_string = None
@@ -256,12 +258,16 @@ def items():
                 query_string = q[1]
                 break
 
-    items_data = db.get_items(limit=limit, query=query_string)
+    items_data = db.get_items(
+        limit=limit, query=query_string, include_hidden=show_hidden
+    )
     formatted_items = []
 
     for item in items_data:
         formatted_items.append(
             {
+                "id": item[0],
+                "hidden": bool(item[8]),
                 "title": item[1],
                 "price": item[2],
                 "currency": item[3],
@@ -305,7 +311,23 @@ def items():
         selected_query=query_id,
         selected_query_display=selected_query_display,
         limit=limit,
+        show_hidden=show_hidden,
     )
+
+
+@app.route("/hide_items", methods=["POST"])
+def hide_items():
+    item_ids = [int(i) for i in request.form.getlist("item_ids") if i.isdigit()]
+    hidden = request.form.get("hidden", "1") == "1"
+    db.set_items_hidden(item_ids, hidden)
+
+    # Back to the same filtered view
+    args = {
+        k: request.form.get(k)
+        for k in ("query", "limit", "show_hidden")
+        if request.form.get(k)
+    }
+    return redirect(url_for("items", **args))
 
 
 @app.route("/config")
