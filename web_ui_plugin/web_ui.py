@@ -164,19 +164,27 @@ def queries():
                 "query": query[1],
                 "display": query_name if query_name else query[1],
                 "last_found_item": last_found_item,
+                "banwords": (db.get_query_banwords(query[0]) or "").replace("|||", "\n"),
             }
         )
 
     return render_template("queries.html", queries=formatted_queries)
 
 
+def form_banwords(text):
+    """Turn a one-word-per-line textarea into the "|||"-separated banwords format."""
+    words = [line.strip() for line in text.splitlines() if line.strip()]
+    return "|||".join(words)
+
+
 @app.route("/add_query", methods=["POST"])
 def add_query():
     query = request.form.get("query")
     query_name = request.form.get("query_name", "").strip()
+    banwords = form_banwords(request.form.get("banwords", ""))
     if query:
         message, is_new_query = core.process_query(
-            query, name=query_name if query_name != "" else None
+            query, name=query_name if query_name != "" else None, banwords=banwords
         )
         if is_new_query:
             flash(f"Query added: {query}", "success")
@@ -214,10 +222,14 @@ def remove_all_queries():
 def update_query(query_id):
     query = request.form.get("query")
     query_name = request.form.get("query_name", "").strip()
+    banwords = form_banwords(request.form.get("banwords", ""))
 
     if query:
         message, success = core.process_update_query(
-            query_id, query, name=query_name if query_name != "" else None
+            query_id,
+            query,
+            name=query_name if query_name != "" else None,
+            banwords=banwords,
         )
         if success:
             flash("Query updated", "success")

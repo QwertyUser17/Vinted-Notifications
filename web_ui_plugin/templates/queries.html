@@ -48,6 +48,20 @@
                         <div class="col-md-2 d-flex align-items-center">
                             <button type="submit" class="btn btn-primary w-100">Add Query</button>
                         </div>
+
+                        <!-- Query banwords (optional) -->
+                        <div class="col-md-12">
+                            <label for="banwords" class="form-label">Banwords&nbsp;<span
+                                    class="text-muted">(optional, this query only)</span></label>
+                            <textarea class="form-control"
+                                      id="banwords"
+                                      name="banwords"
+                                      rows="2"
+                                      placeholder="One word or phrase per line"></textarea>
+                            <div class="form-text">
+                                Checked together with the global banwords from Configuration.
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -131,6 +145,18 @@
                                                                value="{{ query.display if query.display != query.query else '' }}"
                                                                required
                                                                placeholder="My search">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label for="banwords{{ query.id }}" class="form-label">Banwords
+                                                            <span class="text-muted">(this query only)</span></label>
+                                                        <textarea class="form-control"
+                                                                  id="banwords{{ query.id }}"
+                                                                  name="banwords"
+                                                                  rows="5"
+                                                                  placeholder="One word or phrase per line">{{ query.banwords }}</textarea>
+                                                        <div class="form-text">
+                                                            Checked together with the global banwords from Configuration.
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
