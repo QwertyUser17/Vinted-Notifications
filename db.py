@@ -362,11 +362,12 @@ def get_all_parameters():
             conn.close()
 
 
-def get_items(limit=50, query=None):
+def get_items(limit=50, query=None, include_hidden=False):
     conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        hidden_filter = "" if include_hidden else " AND i.hidden=0"
         if query:
             # Get the query_id for the given query
             cursor.execute("SELECT id FROM queries WHERE query=?", (query,))
@@ -375,7 +376,9 @@ def get_items(limit=50, query=None):
                 query_id = result[0]
                 # Get items with the matching query_id
                 cursor.execute(
-                    "SELECT i.item, i.title, i.price, i.currency, i.timestamp, q.query, i.photo_url, q.query_name FROM items i JOIN queries q ON i.query_id = q.id WHERE i.query_id=? ORDER BY i.timestamp DESC LIMIT ?",
+                    "SELECT i.item, i.title, i.price, i.currency, i.timestamp, q.query, i.photo_url, q.query_name, i.hidden FROM items i JOIN queries q ON i.query_id = q.id WHERE i.query_id=?"
+                    + hidden_filter
+                    + " ORDER BY i.timestamp DESC LIMIT ?",
                     (query_id, limit),
                 )
             else:
@@ -383,7 +386,9 @@ def get_items(limit=50, query=None):
         else:
             # Join with queries table to get the query text
             cursor.execute(
-                "SELECT i.item, i.title, i.price, i.currency, i.timestamp, q.query, i.photo_url, q.query_name FROM items i JOIN queries q ON i.query_id = q.id ORDER BY i.timestamp DESC LIMIT ?",
+                "SELECT i.item, i.title, i.price, i.currency, i.timestamp, q.query, i.photo_url, q.query_name, i.hidden FROM items i JOIN queries q ON i.query_id = q.id WHERE 1=1"
+                + hidden_filter
+                + " ORDER BY i.timestamp DESC LIMIT ?",
                 (limit,),
             )
         return cursor.fetchall()
@@ -395,12 +400,54 @@ def get_items(limit=50, query=None):
             conn.close()
 
 
+def set_items_hidden(item_ids, hidden=True):
+    """
+    Hide items from the web UI, or show them again.
+
+    Hidden items stay in the table, so they still count as already seen and
+    are not notified again.
+
+    Args:
+        item_ids (list): Vinted item ids
+        hidden (bool, optional): True to hide, False to show again. Defaults to True.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.executemany(
+            "UPDATE items SET hidden=? WHERE item=?",
+            [(1 if hidden else 0, item_id) for item_id in item_ids],
+        )
+        conn.commit()
+    except Exception:
+        print_exc()
+    finally:
+        if conn:
+            conn.close()
+
+
 def get_total_items_count():
     conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM items")
+        return cursor.fetchone()[0]
+    except Exception:
+        print_exc()
+        return 0
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_hidden_items_count():
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM items WHERE hidden=1")
         return cursor.fetchone()[0]
     except Exception:
         print_exc()
@@ -431,7 +478,7 @@ def get_last_found_item():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT i.item, i.title, i.price, i.currency, i.timestamp, q.query, i.photo_url FROM items i JOIN queries q ON i.query_id = q.id ORDER BY i.timestamp DESC LIMIT 1"
+            "SELECT i.item, i.title, i.price, i.currency, i.timestamp, q.query, i.photo_url FROM items i JOIN queries q ON i.query_id = q.id WHERE i.hidden=0 ORDER BY i.timestamp DESC LIMIT 1"
         )
         return cursor.fetchone()
     except Exception:
