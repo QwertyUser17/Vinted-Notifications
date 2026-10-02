@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 MAX_NOTIFICATIONS_PER_RUN = 10
 
 
-def process_query(query, name=None):
+def process_query(query, name=None, banwords=None):
     """
     Process a Vinted query URL by:
     1. Checking if the URL is a brand URL and converting it to standard format if needed
@@ -28,6 +28,7 @@ def process_query(query, name=None):
     Args:
         query (str): The Vinted query URL
         name (str, optional): A name for the query. If provided, it will be used as the query name.
+        banwords (str, optional): Banwords for this query only, separated by "|||".
 
     Returns:
         tuple: (message, is_new_query)
@@ -85,7 +86,7 @@ def process_query(query, name=None):
         return "Query already exists.", False
     else:
         # add the query to the db
-        db.add_query_to_db(processed_query, name)
+        db.add_query_to_db(processed_query, name, banwords)
         return "Query added.", True
 
 
@@ -146,7 +147,7 @@ def process_remove_query(number):
         return "Invalid number.", False
 
 
-def process_update_query(query_id, query, name):
+def process_update_query(query_id, query, name, banwords=None):
     """
     Process the update of a query in the database.
 
@@ -154,6 +155,8 @@ def process_update_query(query_id, query, name):
         query_id (int): The ID of the query to update
         query (str): The new Vinted query URL
         name (str, optional): A new name for the query. If provided, it will be used as the query name.
+        banwords (str, optional): Banwords for this query only, separated by "|||".
+            None leaves them unchanged.
 
     Returns:
         tuple: (message, success)
@@ -186,7 +189,7 @@ def process_update_query(query_id, query, name):
     )
 
     # Update the query in the database
-    if db.update_query_in_db(query_id, processed_query, name):
+    if db.update_query_in_db(query_id, processed_query, name, banwords):
         return "Query updated.", True
     else:
         return "Failed to update query.", False
@@ -324,6 +327,7 @@ def clear_item_queue(items_queue, new_items_queue):
     if not items_queue.empty():
         data, query_id = items_queue.get()
         banwords_str = db.get_parameter("banwords")
+        query_banwords_str = db.get_query_banwords(query_id)
 
         # Read the watermark once, before the loop. It doubles as the "has this query
         # ever produced anything?" flag, and the updates made below would otherwise
@@ -360,8 +364,10 @@ def clear_item_queue(items_queue, new_items_queue):
             ) not in (db.get_allowlist() + ["XX"]):
                 db.update_last_timestamp(query_id, item.raw_timestamp)
                 continue
-            # Check if the item title contains any banwords
-            if banwords_str and contains_banwords(item.title, banwords_str):
+            # Check the title against the global banwords and this query's own
+            if (banwords_str and contains_banwords(item.title, banwords_str)) or (
+                query_banwords_str and contains_banwords(item.title, query_banwords_str)
+            ):
                 # If it contains banwords, just update the timestamp and skip
                 db.update_last_timestamp(query_id, item.raw_timestamp)
                 continue

@@ -62,6 +62,22 @@ def get_last_timestamp(query_id):
             conn.close()
 
 
+def get_query_banwords(query_id):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT banwords FROM queries WHERE id=?", (query_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+    except Exception:
+        print_exc()
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
 def update_last_timestamp(query_id, timestamp):
     conn = None
     try:
@@ -135,20 +151,15 @@ def is_query_in_db(processed_query):
             conn.close()
 
 
-def add_query_to_db(query, name=None):
+def add_query_to_db(query, name=None, banwords=None):
     conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        if name:
-            cursor.execute(
-                "INSERT INTO queries (query, last_item, query_name) VALUES (?, NULL, ?)",
-                (query, name),
-            )
-        else:
-            cursor.execute(
-                "INSERT INTO queries (query, last_item) VALUES (?, NULL)", (query,)
-            )
+        cursor.execute(
+            "INSERT INTO queries (query, last_item, query_name, banwords) VALUES (?, NULL, ?, ?)",
+            (query, name or None, banwords or None),
+        )
         conn.commit()
     except Exception:
         print_exc()
@@ -210,7 +221,7 @@ def remove_all_queries_from_db():
             conn.close()
 
 
-def update_query_in_db(query_id, query, name):
+def update_query_in_db(query_id, query, name, banwords=None):
     """
     Update an existing query in the database.
 
@@ -218,6 +229,8 @@ def update_query_in_db(query_id, query, name):
         query_id (int): The ID of the query to update
         query (str): The new query URL
         name (str, optional): The new name for the query
+        banwords (str, optional): The query's own banwords, separated by "|||".
+            None leaves them unchanged.
 
     Returns:
         bool: True if the query was updated successfully, False otherwise
@@ -226,10 +239,16 @@ def update_query_in_db(query_id, query, name):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE queries SET query=?, query_name=? WHERE id=?",
-            (query, name, query_id),
-        )
+        if banwords is None:
+            cursor.execute(
+                "UPDATE queries SET query=?, query_name=? WHERE id=?",
+                (query, name, query_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE queries SET query=?, query_name=?, banwords=? WHERE id=?",
+                (query, name, banwords or None, query_id),
+            )
         conn.commit()
         return True
     except Exception:
