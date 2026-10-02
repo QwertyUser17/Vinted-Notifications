@@ -6,6 +6,7 @@ import re
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 from logger import get_logger
+from pyOLX import is_olx_url
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -90,7 +91,7 @@ def index():
                 ),
                 "query": item[5],
                 "photo_url": item[6],
-                "url": f"{urlparse(item[5]).scheme}://{urlparse(item[5]).netloc}/items/{item[0]}",
+                "url": item_url(item[9], item[5], item[0]),
             }
         )
 
@@ -118,7 +119,7 @@ def index():
             ),
             "query": last_item[5],
             "photo_url": last_item[6],
-            "url": f"{urlparse(last_item[5]).scheme}://{urlparse(last_item[5]).netloc}/items/{last_item[0]}"
+            "url": item_url(last_item[7], last_item[5], last_item[0])
         }
     else:
         stats["last_item"] = None
@@ -170,6 +171,14 @@ def queries():
         )
 
     return render_template("queries.html", queries=formatted_queries)
+
+
+def item_url(stored_url, query_url, item_id):
+    """Return the stored item link, or rebuild a Vinted one for items saved before links were stored."""
+    if stored_url:
+        return stored_url
+    parsed = urlparse(query_url)
+    return f"{parsed.scheme}://{parsed.netloc}/items/{item_id}"
 
 
 def form_banwords(text):
@@ -268,6 +277,7 @@ def items():
             {
                 "id": item[0],
                 "hidden": bool(item[8]),
+                "site": "OLX" if is_olx_url(item[5]) else "Vinted",
                 "title": item[1],
                 "price": item[2],
                 "currency": item[3],
@@ -281,7 +291,7 @@ def items():
                     if parse_qs(urlparse(item[5]).query).get("search_text", [None])[0]
                     else item[5]
                 ),
-                "url": f"{urlparse(item[5]).scheme}://{urlparse(item[5]).netloc}/items/{item[0]}",
+                "url": item_url(item[9], item[5], item[0]),
                 "photo_url": item[6],
             }
         )
@@ -317,7 +327,10 @@ def items():
 
 @app.route("/hide_items", methods=["POST"])
 def hide_items():
-    item_ids = [int(i) for i in request.form.getlist("item_ids") if i.isdigit()]
+    # Vinted ids are numbers, OLX ids are stored as "olx-<id>"
+    item_ids = [
+        int(i) if i.isdigit() else i for i in request.form.getlist("item_ids") if i
+    ]
     hidden = request.form.get("hidden", "1") == "1"
     db.set_items_hidden(item_ids, hidden)
 

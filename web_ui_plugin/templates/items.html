@@ -133,7 +133,7 @@
                             </div>
                             <div class="card-footer bg-white p-3">
                                 <a href="{{ item.url }}" target="_blank" class="btn btn-primary w-100 mb-2">
-                                    <i class="bi bi-box-arrow-up-right me-1"></i> View on Vinted
+                                    <i class="bi bi-box-arrow-up-right me-1"></i> View on {{ item.site }}
                                 </a>
                                 {{ hide_form([item.id], not item.hidden, "Show" if item.hidden else "Hide", "btn btn-outline-secondary w-100") }}
                             </div>
@@ -179,7 +179,7 @@
                             <td>{{ item.timestamp }}</td>
                             <td>
                                 <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-box-arrow-up-right me-1"></i> View on Vinted
+                                    <i class="bi bi-box-arrow-up-right me-1"></i> View on {{ item.site }}
                                 </a>
                                 {{ hide_form([item.id], not item.hidden, "Show" if item.hidden else "Hide", "btn btn-sm btn-outline-secondary") }}
                             </td>

@@ -20,7 +20,7 @@
 
                         <!-- Vinted URL (required) -->
                         <div class="col-md-7">
-                            <label for="query" class="form-label">Vinted search URL <span
+                            <label for="query" class="form-label">Vinted or OLX search URL <span
                                     class="text-danger">*</span></label>
                             <input type="url"
                                    class="form-control"
@@ -28,9 +28,10 @@
                                    name="query"
                                    placeholder="https://www.vinted.fr/catalog?search_text=nike+shoes"
                                    required
-                                   pattern="^https?:\/\/(?:www\.)?vinted\.[a-z]{2,}(?:\.[a-z]{2,})*(\/.*)?$">
+                                   pattern="^https?:\/\/(?:www\.)?(?:vinted\.[a-z]{2,}(?:\.[a-z]{2,})*|olx\.pl)(\/.*)?$">
                             <div class="form-text">
-                                Paste a valid Vinted search URL (e.g.&nbsp;`https://www.vinted.fr/catalog?...`)
+                                Paste a Vinted search URL (e.g.&nbsp;`https://www.vinted.fr/catalog?...`) or an OLX one
+                                (e.g.&nbsp;`https://www.olx.pl/oferty/q-...`)
                             </div>
                         </div>
 
@@ -125,7 +126,7 @@
                                                 <div class="modal-body">
                                                     <div class="mb-3">
                                                         <label for="query{{ query.id }}" class="form-label">Vinted
-                                                            search URL <span class="text-danger">*</span></label>
+                                                            or OLX search URL <span class="text-danger">*</span></label>
                                                         <input type="url"
                                                                class="form-control"
                                                                id="query{{ query.id }}"
@@ -133,7 +134,7 @@
                                                                value="{{ query.query }}"
                                                                placeholder="https://www.vinted.fr/catalog?search_text=nike+shoes"
                                                                required
-                                                               pattern="^https?:\/\/(?:www\.)?vinted\.[a-z]{2,}(?:\.[a-z]{2,})*(\/.*)?$">
+                                                               pattern="^https?:\/\/(?:www\.)?(?:vinted\.[a-z]{2,}(?:\.[a-z]{2,})*|olx\.pl)(\/.*)?$">
                                                     </div>
                                                     <div class="mb-3">
                                                         <label for="query_name{{ query.id }}" class="form-label">Name
