@@ -2,6 +2,9 @@ import db
 import requests
 import time
 from pyVintedVN import Vinted, requester
+from pyOLX import Olx, is_olx_url
+from pyOLX.olx import get_search_text as get_olx_search_text
+from pyOLX.olx import normalize_url as normalize_olx_url
 from urllib.parse import urlparse, parse_qs, parse_qsl, urlencode, urlunparse
 from logger import get_logger
 
@@ -35,6 +38,13 @@ def process_query(query, name=None, banwords=None):
             - message (str): Status message
             - is_new_query (bool): True if query was added, False if it already existed
     """
+    if is_olx_url(query):
+        processed_query = normalize_olx_url(query)
+        if db.is_query_in_db(processed_query) is True:
+            return "Query already exists.", False
+        db.add_query_to_db(processed_query, name, banwords)
+        return "Query added.", True
+
     # Check if the URL is a brand URL (format: url/brand/id-name)
     parsed_url = urlparse(query)
     path_parts = parsed_url.path.strip("/").split("/")
@@ -163,30 +173,33 @@ def process_update_query(query_id, query, name, banwords=None):
             - message (str): Status message
             - success (bool): True if query was updated successfully
     """
-    # Parse the URL and extract the query parameters
-    parsed_url = urlparse(query)
-    query_params = parse_qs(parsed_url.query)
+    if is_olx_url(query):
+        processed_query = normalize_olx_url(query)
+    else:
+        # Parse the URL and extract the query parameters
+        parsed_url = urlparse(query)
+        query_params = parse_qs(parsed_url.query)
 
-    # Ensure the order flag is set to newest_first
-    query_params["order"] = ["newest_first"]
-    # Remove time and search_id if provided
-    query_params.pop("time", None)
-    query_params.pop("search_id", None)
-    query_params.pop("disabled_personalization", None)
-    query_params.pop("page", None)
+        # Ensure the order flag is set to newest_first
+        query_params["order"] = ["newest_first"]
+        # Remove time and search_id if provided
+        query_params.pop("time", None)
+        query_params.pop("search_id", None)
+        query_params.pop("disabled_personalization", None)
+        query_params.pop("page", None)
 
-    # Rebuild the query string and the entire URL
-    new_query = urlencode(query_params, doseq=True)
-    processed_query = urlunparse(
-        (
-            parsed_url.scheme,
-            parsed_url.netloc,
-            parsed_url.path,
-            parsed_url.params,
-            new_query,
-            parsed_url.fragment,
+        # Rebuild the query string and the entire URL
+        new_query = urlencode(query_params, doseq=True)
+        processed_query = urlunparse(
+            (
+                parsed_url.scheme,
+                parsed_url.netloc,
+                parsed_url.path,
+                parsed_url.params,
+                new_query,
+                parsed_url.fragment,
+            )
         )
-    )
 
     # Update the query in the database
     if db.update_query_in_db(query_id, processed_query, name, banwords):
@@ -297,15 +310,24 @@ def process_items(queue):
 
     all_queries = db.get_queries()
 
-    # Initialize Vinted
+    # Initialize Vinted, and OLX only if a query needs it
     vinted = Vinted()
+    olx = None
 
     # Get the number of items per query from the database
     items_per_query = int(db.get_parameter("items_per_query"))
 
     # for each keyword we parse data
     for query in all_queries:
-        all_items = vinted.items.search(query[1], nbr_items=items_per_query)
+        try:
+            if is_olx_url(query[1]):
+                olx = olx or Olx()
+                all_items = olx.search(query[1], nbr_items=items_per_query)
+            else:
+                all_items = vinted.items.search(query[1], nbr_items=items_per_query)
+        except Exception as e:
+            logger.error(f"Search failed for query {query[1]}: {e}")
+            continue
         # Filter to only include new items. This should reduce the amount of db calls.
         # svc-catalogue pads exact matches with loosely related listings, so
         # keep only items whose title contains every word of the search text.
@@ -359,7 +381,7 @@ def clear_item_queue(items_queue, new_items_queue):
                 continue
             # If there's an allowlist and
             # If the user's country is not in the allowlist, we just update the timestamp
-            if db.get_allowlist() != 0 and (
+            if item.site_name == "Vinted" and db.get_allowlist() != 0 and (
                 get_user_country(item.raw_data["user"]["id"])
             ) not in (db.get_allowlist() + ["XX"]):
                 db.update_last_timestamp(query_id, item.raw_timestamp)
@@ -384,6 +406,7 @@ def clear_item_queue(items_queue, new_items_queue):
                 photo_url=item.photo,
                 query_id=query_id,
                 currency=item.currency,
+                url=item.url,
             )
 
         if is_first_run:
@@ -413,7 +436,9 @@ def clear_item_queue(items_queue, new_items_queue):
                 image=None if item.photo is None else item.photo,
             )
             # add the item to the queue
-            new_items_queue.put((content, item.url, "Open Vinted", None, None))
+            new_items_queue.put(
+                (content, item.url, f"Open {item.site_name}", None, None)
+            )
             # new_items_queue.put((content, item.url, "Open Vinted", item.buy_url, "Open buy page"))
 
 
@@ -426,6 +451,8 @@ def get_search_words(url):
     Returns:
         list: The search words, empty for filter-only queries
     """
+    if is_olx_url(url):
+        return get_olx_search_text(url).lower().split()
     queries = parse_qsl(urlparse(url).query)
     text = " ".join(value for key, value in queries if key == "search_text")
     return text.lower().split()

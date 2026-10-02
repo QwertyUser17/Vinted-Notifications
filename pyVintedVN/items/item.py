@@ -31,6 +31,8 @@ class Item:
         has_real_timestamp (bool): True when the API actually gave us a listing time.
     """
 
+    site_name = "Vinted"
+
     def __init__(self, data, locale=None):
         """
         Initialize an Item with data from the Vinted API.
